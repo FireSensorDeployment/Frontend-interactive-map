@@ -9,12 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.1.14",
+    "@deck.gl/layers": "^9.1.14",
     "@mapbox/mapbox-gl-draw": "^1.5.0",
     "@turf/turf": "^7.2.0",
     "mapbox-gl": "^3.14.0",
     "next": "15.5.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-map-gl": "^8.0.4",
+    "turf": "^3.0.14",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

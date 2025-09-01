@@ -1,19 +1,17 @@
 'use client'
-import MapShell from '@/components/map/MapShell'
+import MapRoot from '@/components/map/MapRoot'
 import FireRisk from '@/components/map/layers/FireRisk'
-import DrawAOI from '@/components/map/aoi/DrawAOI'
+import DrawControl from '@/components/map/controls/DrawControl'
+import AOIPreview from '@/components/map/layers/AOIPreview'
 import AOIPanel from '@/components/map/panels/AOIPanel'
 
-
-// 聚合组件
 export default function Page() {
   return (
-    <main style={{ margin: 0, padding: 0 }}>
-      <MapShell>
-        <FireRisk /> {/* 火险图层 */}
-        <DrawAOI /> {/* 绘制 AOI */}
-        <AOIPanel /> {/* AOI 面板 */}
-      </MapShell>
-    </main>
+    <MapRoot>
+      <DrawControl position="top-left" />
+      <AOIPreview />
+      <FireRisk />
+      <AOIPanel />
+    </MapRoot>
   )
 }
