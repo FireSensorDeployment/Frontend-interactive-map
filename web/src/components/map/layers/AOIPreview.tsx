@@ -13,7 +13,7 @@ export default function AOIPreview() {
 
   const preview = useMemo(() => {
     if (!aoi) return { type: 'FeatureCollection', features: [] } as any
-    return turf.buffer(aoi, 0.3, { units: 'kilometers' })
+    return turf.buffer(aoi, 0, { units: 'kilometers' })
   }, [aoi])
 
   return (
