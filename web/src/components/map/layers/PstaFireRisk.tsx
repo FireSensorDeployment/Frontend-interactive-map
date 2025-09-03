@@ -2,15 +2,15 @@
 import { useEffect, useState } from 'react'
 import { Source, Layer } from 'react-map-gl/mapbox'
 import * as turf from '@turf/turf'
-import type { Polygon, MultiPolygon, Feature } from 'geojson'
-import { useAOIStore } from '@/store/useAOIStore'
+import type { Polygon, MultiPolygon, Feature } from 'geojson' // 约束 AOI 的数据结构
+import { useAOIStore } from '@/store/useAOIStore' // 全局状态，读取用户画的 AOI
 
 type Props = {
   visible?: boolean
   opacity?: number
-  maxAreaKm2?: number
+  maxAreaKm2?: number // AOI 超过这个面积就不加载（避免超大范围卡顿）
   beforeId?: string
-  tileSize?: number // 256 或 512，和 WMS width/height 对应
+  tileSize?: number // 瓦片大小（要与 WMS 的 width/height 匹配）
 }
 
 const SRC_ID = 'psta-wms-src'
@@ -27,8 +27,10 @@ const PSTA_WMS_BASE = (tileSize: number) =>
   '&srs=EPSG:3857&bbox={bbox-epsg-3857}' +
   `&width=${tileSize}&height=${tileSize}`
 
-/** Polygon/MultiPolygon(WGS84) → 带 SRID 的 WKT（GeoServer 会重投影） */
-function toWkt4326(geom: Polygon | MultiPolygon): string {
+
+// 把 AOI 的 GeoJSON（WGS84 坐标）转成带 SRID=4326 的 WKT 字符串。
+// GeoServer 看到带 SRID 的 WKT，会自动按目标 SRS（我们请求里是 3857）重投影。
+function toWkt4326(geom: Polygon | MultiPolygon): string { 
   const fmt = (ring: number[][]) => ring.map(([x, y]) => `${x} ${y}`).join(',')
   if (geom.type === 'Polygon') {
     const rings = geom.coordinates.map(r => `(${fmt(r as any)})`).join(',')
@@ -41,14 +43,17 @@ function toWkt4326(geom: Polygon | MultiPolygon): string {
   }
 }
 
-/** 生成带 CQL_FILTER 的 WMS 瓦片 URL（仅渲染 AOI 相交部分） */
+// 构造带过滤条件的 WMS URL：
+// 使用 CQL 过滤 WITHIN(SHAPE, WKT)，让服务端只渲染 AOI 内部的像素；
+// 字段名常为 SHAPE（不是 GEOMETRY）；
 function buildTilesUrl(aoi: Feature<Polygon | MultiPolygon>, tileSize: number) {
   const wkt = toWkt4326(aoi.geometry)
-  // ⚠️ 常见几何字段是 SHAPE（不是 GEOMETRY）
-  const cql = `INTERSECTS(SHAPE, ${wkt})`
+  // 常见几何字段是 SHAPE（不是 GEOMETRY）
+  const cql = `WITHIN(SHAPE, ${wkt})`
   return `${PSTA_WMS_BASE(tileSize)}&CQL_FILTER=${encodeURIComponent(cql)}`
 }
 
+// 定义组件与默认参数：默认显示、70% 不透明、最大面积 5000 km²、512 瓦片。
 export default function PstaFireRisk({
   visible = true,
   opacity = 0.7,
@@ -56,7 +61,9 @@ export default function PstaFireRisk({
   beforeId,
   tileSize = 512
 }: Props) {
+    // 从全局状态取 AOI
   const aoi = useAOIStore(s => s.aoi)
+  //本地状态存当前使用的瓦片 URL（带不带 CQL）。
   const [tilesUrl, setTilesUrl] = useState<string | null>(null)
 
   useEffect(() => {
