@@ -49,7 +49,7 @@ function toWkt4326(geom: Polygon | MultiPolygon): string {
 function buildTilesUrl(aoi: Feature<Polygon | MultiPolygon>, tileSize: number) {
   const wkt = toWkt4326(aoi.geometry)
   // 常见几何字段是 SHAPE（不是 GEOMETRY）
-  const cql = `WITHIN(SHAPE, ${wkt})`
+  const cql = `INTERSECTS(SHAPE, ${wkt})`
   return `${PSTA_WMS_BASE(tileSize)}&CQL_FILTER=${encodeURIComponent(cql)}`
 }
 

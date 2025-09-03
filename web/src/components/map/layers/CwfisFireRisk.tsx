@@ -20,7 +20,7 @@ const CWFIS_FDR_WMS =
 
 export default function CwfisFireRisk({
   visible = true,
-  opacity = 0.6,
+  opacity = 0.2,
   beforeId,
   tileSize = 512
 }: Props) {
