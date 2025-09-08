@@ -43,11 +43,27 @@ export default function AOIPanel() {
       const candidates = map.queryRenderedFeatures(screenBox, { layers: [l.id] }) as unknown as GeoJSON.Feature[]
       const hits: GeoJSON.Feature[] = []
       for (const f of candidates) {
-        try {
-          const ok = l.mode === 'contains'
-            ? turf.booleanContains(aoi as any, f as any)
-            : turf.booleanIntersects(f as any, aoi as any)
-          if (ok) hits.push(f)
+       try {
+  // f 来自 queryRenderedFeatures，按标准 GeoJSON.Feature 构造一份
+          const feat: GeoJSON.Feature = {
+            type: 'Feature',
+            geometry: (f as GeoJSON.Feature).geometry!,
+            properties: (f as GeoJSON.Feature).properties ?? {}
+          }
+
+          // 点/多点用 pointsWithinPolygon，其它用 contains/intersects
+          let ok: boolean
+          const t = feat.geometry?.type
+          if (t === 'Point' || t === 'MultiPoint') {
+            const fc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [feat] }
+            ok = turf.pointsWithinPolygon(fc, aoi as GeoJSON.Feature<GeoJSON.Polygon>).features.length > 0
+          } else {
+            ok = l.mode === 'contains'
+              ? turf.booleanContains(aoi as GeoJSON.Feature<GeoJSON.Polygon>, feat)
+              : turf.booleanIntersects(feat, aoi as GeoJSON.Feature<GeoJSON.Polygon>)
+          }
+
+          if (ok) hits.push(feat)
         } catch {}
       }
       next[l.id] = { type: 'FeatureCollection', features: hits }
