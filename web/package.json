@@ -18,7 +18,6 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-map-gl": "^8.0.4",
-    "turf": "^3.0.14",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
