@@ -10,8 +10,6 @@ export async function collectAndPostSelection(opts: {
   endpoint?: string
 }) {
   const { map, aoi, layers, endpoint = '/api/selection' } = opts
-  const bbox4326 = turf.bbox(aoi) // [minX,minY,maxX,maxY] in EPSG:4326
-
   const [minX, minY, maxX, maxY] = turf.bbox(aoi)
   const pMin = map.project([minX, minY])
   const pMax = map.project([maxX, maxY])
