@@ -4,8 +4,6 @@ import * as turf from '@turf/turf'
 import { useAOIStore } from '@/store/useAOIStore'
 import { useMapInfoStore } from '@/store/useMapInfoStore'
 import { useMap } from 'react-map-gl/mapbox'
-// ⭐ NEW: 引入 CWFIS 常量（图层 id 与元数据）
-import { CWFIS_LAYER_ID, CWFIS_WMS_META } from '@/components/map/layers/CwfisFireRisk'
 
 export default function AOIPanel() {
   const { aoi } = useAOIStore()
@@ -35,14 +33,14 @@ export default function AOIPanel() {
   useEffect(() => {
     if (!map || !aoi) { setPreview({}); return }
     const [minX, minY, maxX, maxY] = turf.bbox(aoi)
-    const pMin = (map as any).project([minX, minY])
-    const pMax = (map as any).project([maxX, maxY])
+    const pMin = map.project([minX, minY])
+    const pMax = map.project([maxX, maxY])
     const screenBox: [mapboxgl.PointLike, mapboxgl.PointLike] = [pMin, pMax]
 
     const next: Record<string, GeoJSON.FeatureCollection> = {}
     for (const l of Object.values(layers)) {
       if (!l.selected) continue
-      const candidates = (map as any).queryRenderedFeatures(screenBox, { layers: [l.id] }) as unknown as GeoJSON.Feature[]
+      const candidates = map.queryRenderedFeatures(screenBox, { layers: [l.id] }) as unknown as GeoJSON.Feature[]
       const hits: GeoJSON.Feature[] = []
       for (const f of candidates) {
         try {
@@ -54,15 +52,6 @@ export default function AOIPanel() {
       }
       next[l.id] = { type: 'FeatureCollection', features: hits }
     }
-
-    // ⭐ NEW: 如果地图里存在 CWFIS 栅格层，把它也加入预览（作为“不可查询”的占位项）
-    const hasCwfis =
-      !!(map as any)?.getLayer?.(CWFIS_LAYER_ID) ||
-      !!((map as any)?.getStyle?.().layers ?? []).some((l: any) => l.id === CWFIS_LAYER_ID)
-    if (hasCwfis) {
-      next[CWFIS_LAYER_ID] = { type: 'FeatureCollection', features: [] }
-    }
-
     setPreview(next)
   }, [map, aoi, layers])
 
@@ -108,48 +97,18 @@ export default function AOIPanel() {
         {Object.keys(preview).length === 0 && (
           <div style={{ color:'#666', marginTop:6 }}>暂无命中要素</div>
         )}
-        {Object.entries(preview).map(([layerId, fc]) => {
-          const isCwfis = layerId === CWFIS_LAYER_ID // ⭐ NEW
-          // ⭐ NEW: 若是 CWFIS，实时读可见性/透明度（不占用状态）
-          const visible = isCwfis
-            ? ((map as any)?.getLayoutProperty?.(CWFIS_LAYER_ID, 'visibility') !== 'none')
-            : undefined
-          const opacity = isCwfis
-            ? ((map as any)?.getPaintProperty?.(CWFIS_LAYER_ID, 'raster-opacity') as number | null)
-            : undefined
-
-          return (
-            <div key={layerId} style={{ marginTop:6 }}>
-              <div style={{ fontWeight:600 }}>
-                {layerId}
-                {isCwfis && <span style={{ color:'#888', marginLeft:6 }}>(Raster · WMS)</span>}
-              </div>
-
-              <div style={{ color:'#666' }}>
-                命中 {fc.features.length} 个要素
-                {!isCwfis && null}
-                {isCwfis && <>（候选 N/A）</>}
-              </div>
-
-              {/* ⭐ NEW: CWFIS 的元数据展示 */}
-              {isCwfis && (
-                <div style={{ color:'#666', marginTop:4 }}>
-                  可见性：{visible ? 'visible' : 'none'} · 透明度：{opacity ?? '—'} · WMS Layer：{CWFIS_WMS_META.layer}
-                  <div style={{ wordBreak:'break-all' }}>
-                    Endpoint：{CWFIS_WMS_META.endpoint}
-                  </div>
-                </div>
-              )}
-
-              <details>
-                <summary style={{ cursor:'pointer' }}>查看前 5 条</summary>
-                <pre style={{ maxHeight:160, overflow:'auto', margin:0, whiteSpace:'pre-wrap' }}>
-                  {JSON.stringify(fc.features.slice(0, 5), null, 2)}
-                </pre>
-              </details>
-            </div>
-          )
-        })}
+        {Object.entries(preview).map(([layerId, fc]) => (
+          <div key={layerId} style={{ marginTop:6 }}>
+            <div style={{ fontWeight:600 }}>{layerId}</div>
+            <div style={{ color:'#666' }}>命中 {fc.features.length} 个要素</div>
+            <details>
+              <summary style={{ cursor:'pointer' }}>查看前 5 条</summary>
+              <pre style={{ maxHeight:160, overflow:'auto', margin:0, whiteSpace:'pre-wrap' }}>
+                {JSON.stringify(fc.features.slice(0, 5), null, 2)}
+              </pre>
+            </details>
+          </div>
+        ))}
       </div>
     </div>
   )
