@@ -1,8 +1,9 @@
+// components/MapRoot.tsx
 'use client'
 import Map, { NavigationControl } from 'react-map-gl/mapbox'
 import mapboxgl from 'mapbox-gl'
 import { useCallback } from 'react'
-import { useMapInfoStore } from '@/store/useMapInfoStore'
+import { useMapInfoStore, PSTA_LAYER_ID, type LayerMode } from '@/store/useMapInfoStore'
 
 // 可查询“矢量样式层”的类型白名单（只针对样式层类型，不是数据源类型）
 const VECTOR_LAYER_TYPES = new Set(['fill', 'line', 'symbol', 'circle', 'fill-extrusion'])
@@ -21,8 +22,7 @@ type Props = {
 }
 
 export default function MapRoot({ children, height = '100vh', width = '100vw' }: Props) {
-
-  // 从全局 store 取出“注册图层”方法；注册后你的 AOI 面板会显示这些可选图层
+  // 从全局 store 取出“注册图层”方法；注册后 AOI 面板会显示这些可选图层
   const registerLayers = useMapInfoStore((s) => s.registerLayers)
 
   // 地图样式加载完成时触发：在这里收集并注册需要的样式层（layerId）
@@ -35,50 +35,35 @@ export default function MapRoot({ children, height = '100vh', width = '100vw' }:
         const style = map.getStyle()
         const allLayers = (style?.layers ?? []) as StyleLayer[]
 
-         // 仅保留“矢量类”样式层（raster/heatmap/hillshade/background 这些不参与要素查询）
+        // 仅保留“矢量类”样式层（raster/heatmap/hillshade/background 这些不参与要素查询）
         const vectorLayers = allLayers.filter((l) => VECTOR_LAYER_TYPES.has(l.type))
 
-        /**
-         * ① （可选）收集“真实道路”层：road-/bridge-/tunnel- 前缀、线几何、来自 source-layer='road'，
-         *     排除外描边(-case)和文字/盾牌(label/shield)；并只保留四大等级（motorway/trunk/primary/secondary/tertiary/street/residential）
-         *     —— 目前这段被注释掉：如果你以后要把道路也注册进来，取消注释，并把下面 finalIds 合并 roadIds 即可。
-         *
-         * const FOUR_LEVEL_RE = new RegExp(
-         *   '^(road|bridge|tunnel)-(?:motorway|trunk|primary|secondary|tertiary|secondary-tertiary|street|residential)(?:-|$)',
-         *   'i'
-         * )
-         * const roadIds = vectorLayers
-         *   .filter(l =>
-         *     l.type === 'line' &&
-         *     (l as any)['source-layer'] === 'road' &&
-         *     /^(road|bridge|tunnel)-/i.test(l.id) &&
-         *     !/-case$/i.test(l.id) &&
-         *     !/label|shield/i.test(l.id) &&
-         *     FOUR_LEVEL_RE.test(l.id)
-         *   )
-         *   .map(l => l.id)
-         */
-
-        // ② 额外加上 building / water（如果存在）
+        // 额外加上 building / water（如果存在）
         const extras = ['building', 'water'].filter((id) =>
           vectorLayers.some((l) => l.id === id)
         )
 
-        // ③ 去重
+        // 去重
         const finalIds = Array.from(new Set([...extras]))
 
-        // ④ 全部注册（道路用 intersects，building 用 contains）
-        registerLayers(
-          finalIds.map((id) => ({
-            id,
-            label: id,              // 面板显示用的名字：保持与 layerId 一致
-            defaultSelected: true,  // 默认勾选，画 AOI 后就能看到命中
-            defaultMode:            // 交集判定；严格可改 'contains'
-              id === 'building' ? ('intersects' as const) : ('intersects' as const),
-          }))
-        )
+        // 为了通过类型校验：把常用字面量标注成 LayerMode
+        const INTERSECTS: LayerMode = 'intersects'
+        // 如果以后想让 building 用 contains，可以这样：
+        // const CONTAINS: LayerMode = 'contains'
 
-        console.log('[Registered layers]', finalIds)
+        // 统一注册：样式层 + PSTA（显式加入）
+        registerLayers([
+          { id: PSTA_LAYER_ID, label: 'PSTA Fire Threat', defaultSelected: true, defaultMode: INTERSECTS },
+          ...finalIds.map((id) => ({
+            id,
+            label: id,
+            defaultSelected: true,
+            // 现在都用 intersects；若要对某层特殊处理，改这里返回对应 LayerMode 即可
+            defaultMode: INTERSECTS,
+          })),
+        ])
+
+        console.log('[Registered layers]', [PSTA_LAYER_ID, ...finalIds])
       })
     },
     [registerLayers]
