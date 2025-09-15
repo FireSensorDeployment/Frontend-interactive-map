@@ -2,7 +2,7 @@
 // CWFIS 的 WMS 服务直接用 URL 就行
 // BC Gov 的 ArcGIS 服务需要自己拉要素并渲染（因为没有现成的瓦片服务）
 // 这里的 PSTA 图层只显示 AOI 相交部分，且当 AOI 面积过大时不显示
-// 目前这个文档不在使用，仅供参考
+// ！！目前这个文档不在使用，仅供参考
 
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'

@@ -15,7 +15,7 @@ export default function Page() {
     <MapRoot>
       <DrawControl position="top-left" />
       <AOIPreview />
-      <PstaFireRisk />
+      <PstaFireRisk visible opacity={0.7} /* beforeId 可选 */ />
       <CwfisFireRisk />
       <AOIPanel />
     </MapRoot>

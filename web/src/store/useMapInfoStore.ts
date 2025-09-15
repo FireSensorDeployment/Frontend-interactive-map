@@ -1,56 +1,107 @@
-// AOI 状态管理，负责保存和更新用户绘制的 AOI（区域），唯一
-
+// store/useMapInfoStore.ts
+// 这是个针对底图的中间层，用来存放和管理“可查询的图层”信息
+// 这些图层信息会被 AOI 面板读取，并显示成可选项
+// 这里使用了 Zustand 来创建一个全局状态仓库（store）
+// 这个 store 里只会存放唯一一份图层信息
 'use client'
-import { create } from 'zustand' // Zustand 提供的函数，用来创建一个“全局状态仓库”（store）
+import { create } from 'zustand'
 
-// 这里创建了 store，并导出成 useMapInfoStore 这个钩子（hook）：
-// 用来管理地图上的图层信息，比如哪些图层被选中，图层的筛选模式等
-// 这个实现方式保证了 全局状态里只会存放唯一一份 图层信息
-// 方便后续传递给后端用来生成sensor plan
+/** AOI 空间筛选方式，包含 相交 和 内部 */
 export type LayerMode = 'intersects' | 'contains'
 
+/** 面板里可被勾选/统计的图层元信息 */
 export type LayerMeta = {
-  id: string            // mapbox layerId
-  label?: string        // UI 显示名
-  selected: boolean     // 是否参与提交
-  mode: LayerMode       // 空间筛选方式
+  id: string
+  label?: string
+  selected: boolean
+  mode: LayerMode
 }
 
+/** 和 PstaFireRisk 保持一致的 layerId（便于统一引用） */
+export const PSTA_LAYER_ID = 'psta-wms-layer'
+
+// 定义 MapInfoState，描述这个 store 里存的内容和操作：
+// layers: 一个字典，key 是图层 id，value 是 LayerMeta（图层元信息）
+// registerLayers: 注册一组图层定义（id + 可选 label + 可选默认选中状态 + 可选默认模式）
+// toggleLayer: 切换某个图层的选中状态（如果传了 selected 就设置成那个值，否则取反）
+// setLayerMode: 设置某个图层的筛选模式（intersects / contains）
+// removeLayer: 从 store 里移除某个图层
+// reset: 重置 store，清空所有图层
+// selectedLayerIds: 返回当前被选中的图层 id 列表
 type MapInfoState = {
   layers: Record<string, LayerMeta>
-  // 批量或单个注册图层（初始化时调用一次）
-  registerLayers: (defs: { id: string; label?: string; defaultSelected?: boolean; defaultMode?: LayerMode }[]) => void
-  // 勾选/取消图层
+  registerLayers: (
+    defs: { id: string; label?: string; defaultSelected?: boolean; defaultMode?: LayerMode }[]
+  ) => void
   toggleLayer: (id: string, selected?: boolean) => void
-  // 修改筛选模式
   setLayerMode: (id: string, mode: LayerMode) => void
-  // 选中的 layerId 列表（便于调用）
+  removeLayer: (id: string) => void
+  reset: () => void
   selectedLayerIds: () => string[]
 }
 
+// 创建并导出 useMapInfoStore 这个钩子（hook）：
+// create<MapInfoState>：告诉 Zustand，这个 store 的结构必须符合 MapInfoState。
+// layers: {}：初始值是空对象，也就是一开始没有任何图层。
+// 各种方法的实现都比较直观，都是基于 set 和 get 来更新或读取当前状态。
+// 这个实现方式保证了 全局状态里只会存放唯一一份图层信息
 export const useMapInfoStore = create<MapInfoState>((set, get) => ({
+  // ✅ 空启动：不预置任何图层
   layers: {},
-  registerLayers: (defs) => set((s) => {
-    const next = { ...s.layers }
-    for (const d of defs) {
-      next[d.id] = next[d.id] ?? {
-        id: d.id,
-        label: d.label ?? d.id,
-        selected: d.defaultSelected ?? true,
-        mode: d.defaultMode ?? 'intersects'
+
+  // ✅ 支持批量注册图层定义（不会覆盖已存在的，只会更新 label）
+  registerLayers: (defs) =>
+    set((s) => {
+      const next = { ...s.layers }
+      for (const d of defs) {
+        if (next[d.id]) {
+          next[d.id] = {
+            ...next[d.id],
+            label: d.label ?? next[d.id].label,
+          }
+        } else {
+          next[d.id] = {
+            id: d.id,
+            label: d.label ?? d.id,
+            selected: d.defaultSelected ?? true,
+            mode: d.defaultMode ?? 'intersects',
+          }
+        }
       }
-    }
-    return { layers: next }
-  }),
-  toggleLayer: (id, selected) => set((s) => {
-    const cur = s.layers[id]
-    if (!cur) return s
-    return { layers: { ...s.layers, [id]: { ...cur, selected: selected ?? !cur.selected } } }
-  }),
-  setLayerMode: (id, mode) => set((s) => {
-    const cur = s.layers[id]
-    if (!cur) return s
-    return { layers: { ...s.layers, [id]: { ...cur, mode } } }
-  }),
-  selectedLayerIds: () => Object.values(get().layers).filter(l => l.selected).map(l => l.id)
+      return { layers: next }
+    }),
+
+  // ✅ 支持传入 selected 来显式设置选中状态
+  toggleLayer: (id, selected) =>
+    set((s) => {
+      const cur = s.layers[id]
+      if (!cur) return s
+      return { layers: { ...s.layers, [id]: { ...cur, selected: selected ?? !cur.selected } } }
+    }),
+
+  // ✅ 直接设置 mode
+  setLayerMode: (id, mode) =>
+    set((s) => {
+      const cur = s.layers[id]
+      if (!cur) return s
+      return { layers: { ...s.layers, [id]: { ...cur, mode } } }
+    }),
+
+  // ✅ 删除某个图层
+  removeLayer: (id) =>
+    set((s) => {
+      if (!s.layers[id]) return s
+      const next = { ...s.layers }
+      delete next[id]
+      return { layers: next }
+    }),
+
+  // ✅ reset 也恢复为空
+  reset: () => set({ layers: {} }),
+
+  // ✅ 返回当前被选中的图层 id 列表
+  selectedLayerIds: () =>
+    Object.values(get().layers)
+      .filter((l) => l.selected)
+      .map((l) => l.id),
 }))

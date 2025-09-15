@@ -44,13 +44,10 @@ export default function AOIPanel() {
       const hits: GeoJSON.Feature[] = []
       for (const f of candidates) {
         try {
-          // Use type guards to ensure valid GeoJSON features/geometries
-          if (isGeoJSONFeature(f) && (isGeoJSONFeature(aoi) || isGeoJSONGeometry(aoi))) {
-            const ok = l.mode === 'contains'
-              ? turf.booleanContains(aoi, f)
-              : turf.booleanIntersects(f, aoi)
-            if (ok) hits.push(f)
-          }
+          const ok = l.mode === 'contains'
+            ? turf.booleanContains(aoi as any, f as any)
+            : turf.booleanIntersects(f as any, aoi as any)
+          if (ok) hits.push(f)
         } catch {}
       }
       next[l.id] = { type: 'FeatureCollection', features: hits }
