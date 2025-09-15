@@ -1,4 +1,8 @@
 // components/PstaFireRisk.tsx
+// 这是个针对 PSTA 火险的图层组件
+// 它使用 WFS 拉取要素，并用 Mapbox GL 的表达式来渲染颜色
+// 只在 AOI 内显示，且当 AOI 面积过大时不显示（避免卡顿）
+// 同时做了地图要素的处理，保证不会影响到底图信息的获取
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Source, Layer } from 'react-map-gl/mapbox'
@@ -15,10 +19,12 @@ const WFS_ENDPOINT = 'https://openmaps.gov.bc.ca/geo/pub/ows'
 const TYPE_NAME = 'pub:WHSE_LAND_AND_NATURAL_RESOURCE.PROT_PSTA_FIRE_THREAT_RTG_SP'
 
 // ======= ArcGIS 渲染样式（读取官方 renderer，用于颜色表达式） =======
+// 从官方 ArcGIS MapServer 读取该图层的渲染规则（class breaks / unique values 等）
 const PSTA_META =
   'https://delivery.maps.gov.bc.ca/arcgis/rest/services/whse/bcgw_pub_whse_land_and_natural_resource/MapServer/17?f=pjson'
 
 // ---------- 工具：AOI -> WKT(SRID=4326) ----------
+// 把 AOI（Polygon/MultiPolygon，坐标是经纬度）转成带 SRID 的 WKT，用于 WFS 的 CQL_FILTER
 function toWkt4326(geom: Polygon | MultiPolygon): string {
   const fmt = (ring: number[][]) => ring.map(([x, y]) => `${x} ${y}`).join(',')
   if (geom.type === 'Polygon') {
@@ -31,6 +37,8 @@ function toWkt4326(geom: Polygon | MultiPolygon): string {
     return `SRID=4326;MULTIPOLYGON(${polys})`
   }
 }
+
+// 构造一次 WFS 请求：指定几何字段名（不同服务可能叫 SHAPE 或 GEOMETRY）、分页参数等
 function buildWfsUrl(
   aoi: Feature<Polygon | MultiPolygon>,
   geomField: 'SHAPE' | 'GEOMETRY',
@@ -38,7 +46,7 @@ function buildWfsUrl(
   startIndex: number
 ) {
   const wkt = toWkt4326(aoi.geometry)
-  const cql = `INTERSECTS(${geomField}, ${wkt})`
+  const cql = `INTERSECTS(${geomField}, ${wkt})`   // 只取与 AOI 相交的要素
   const qs = new URLSearchParams({
     service: 'WFS',
     version: '2.0.0',
@@ -46,14 +54,16 @@ function buildWfsUrl(
     typeNames: TYPE_NAME,
     outputFormat: 'application/json',
     srsName: 'EPSG:4326',
-    count: String(count),
-    startIndex: String(startIndex),
+    count: String(count),             // 每页条数
+    startIndex: String(startIndex),   // 起始索引
     CQL_FILTER: cql
   })
   return `${WFS_ENDPOINT}?${qs.toString()}`
 }
 
 // ---------- 拉 WFS：分页 + 几何字段兜底 ----------
+// 尝试用 SHAPE 字段；若该服务没有，则用 GEOMETRY 字段兜底。
+// 分页拉取，直到达到 cap 或没数据为止。
 async function fetchAllWfs(
   aoi: Feature<Polygon | MultiPolygon>,
   cap: number,

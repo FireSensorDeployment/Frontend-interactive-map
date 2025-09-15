@@ -1,4 +1,5 @@
 // components/MapRoot.tsx
+// 这是wfs的实现方式，用来替代之前的wms，可以和矢量底图的样式层进行空间查询
 'use client'
 import Map, { NavigationControl } from 'react-map-gl/mapbox'
 import mapboxgl from 'mapbox-gl'
@@ -8,6 +9,7 @@ import { useMapInfoStore, PSTA_LAYER_ID, type LayerMode } from '@/store/useMapIn
 // 可查询“矢量样式层”的类型白名单（只针对样式层类型，不是数据源类型）
 const VECTOR_LAYER_TYPES = new Set(['fill', 'line', 'symbol', 'circle', 'fill-extrusion'])
 
+// 定义 StyleLayer 类型，表示地图样式中的一个图层
 type StyleLayer = {
   id: string
   type: string
@@ -15,6 +17,7 @@ type StyleLayer = {
   ['source-layer']?: string
 }
 
+// 定义组件的 Props 类型
 type Props = {
   children?: React.ReactNode
   height?: string | number

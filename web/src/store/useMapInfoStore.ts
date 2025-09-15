@@ -1,5 +1,8 @@
 // store/useMapInfoStore.ts
-// 这个实现方式保证了 全局状态里只会存放唯一一份图层信息，且可以后续扩展勾选不同图层
+// 这是个针对底图的中间层，用来存放和管理“可查询的图层”信息
+// 这些图层信息会被 AOI 面板读取，并显示成可选项
+// 这里使用了 Zustand 来创建一个全局状态仓库（store）
+// 这个 store 里只会存放唯一一份图层信息
 'use client'
 import { create } from 'zustand'
 
