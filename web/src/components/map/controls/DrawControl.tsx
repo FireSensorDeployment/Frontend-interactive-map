@@ -11,6 +11,7 @@ import { useControl } from 'react-map-gl/mapbox' // 把外部控件挂载到地�
 import MapboxDraw from '@mapbox/mapbox-gl-draw' // 画图的核心库
 import type { Feature, Polygon } from 'geojson'  // 类型声明，告诉 TS AOI 是一个多边形的 GeoJSON 对象
 import { useAOIStore } from '@/store/useAOIStore' // 全局状态，用来存画出来的 AOI
+import { useSensorStore } from '@/store/useSensorStore' // 全局状态，用来存传感器数据
 
 type Props = {
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'  // 控件位置，后面可能会调整
@@ -18,6 +19,7 @@ type Props = {
 
 export default function DrawControl({ position = 'top-left' }: Props) {
   const setAOI = useAOIStore(s => s.setAOI) // 生成组件，用来存 AOI结果，其他组件可以用
+  const clearSensors = useSensorStore(s => s.clearSensors) // 获取清空传感器的方法
 
   // 画图事件回调，创建或更新时触发，储存 AOI
   const onCreateOrUpdate = useCallback((e: any) => { //当用户画了一个 AOI 或更新 AOI 时触发
@@ -29,12 +31,16 @@ export default function DrawControl({ position = 'top-left' }: Props) {
         geometry: f.geometry,
         properties: f.properties ?? {}
       }
+      clearSensors() // 清空旧的传感器点（来自之前的 AOI）
       setAOI(aoi)
     }
-  }, [setAOI])
+  }, [setAOI, clearSensors])
 
   // 定义删除事件回调：当用户点垃圾桶时，把 AOI 清空
-  const onDelete = useCallback(() => setAOI(null), [setAOI])
+  const onDelete = useCallback(() => {
+    clearSensors() // 清空传感器点（因为 AOI 没了，传感器也应该消失）
+    setAOI(null)
+  }, [setAOI, clearSensors])
 
   // 用 useControl 把 MapboxDraw 控件挂到地图上
   const draw = useControl<MapboxDraw>(
