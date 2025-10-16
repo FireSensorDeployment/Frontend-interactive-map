@@ -76,13 +76,22 @@ export default function SensorLayer() {
     const feature = event.features?.[0]
     if (!feature || !map) return
 
-    const clusterId = feature.properties.cluster_id
-    const coordinates = feature.geometry.coordinates as [number, number]
+    const clusterId = feature.properties?.cluster_id
+    const coordinates = feature.geometry?.coordinates as [number, number]
+
+    // 验证必要数据
+    if (!clusterId || !coordinates || coordinates.length !== 2) {
+      console.error('[SensorLayer] Cluster 数据无效')
+      return
+    }
 
     try {
       // 获取 cluster 中的所有点
       const source = map.getSource(SENSOR_SOURCE_ID) as any
-      if (!source) return
+      if (!source || !source.getClusterLeaves) {
+        console.error('[SensorLayer] Source 不可用或不支持 clustering')
+        return
+      }
 
       source.getClusterLeaves(
         clusterId,
@@ -91,6 +100,12 @@ export default function SensorLayer() {
         (error: any, features: any[]) => {
           if (error) {
             console.error('[SensorLayer] 获取 cluster leaves 失败:', error)
+            setError('无法加载集群详情')
+            return
+          }
+
+          if (!features || features.length === 0) {
+            console.warn('[SensorLayer] Cluster 为空')
             return
           }
 
@@ -110,8 +125,9 @@ export default function SensorLayer() {
       )
     } catch (error) {
       console.error('[SensorLayer] Cluster 点击处理失败:', error)
+      setError('点击处理失败')
     }
-  }, [map])
+  }, [map, setError])
 
   // 关闭 popup
   const handleClosePopup = useCallback(() => {
@@ -125,13 +141,30 @@ export default function SensorLayer() {
   // Sensor 点击处理器
   const handleSensorClick = useCallback((event: any) => {
     const feature = event.features?.[0]
-    if (!feature) return
+    if (!feature || !feature.geometry?.coordinates) return
+
+    const coordinates = feature.geometry.coordinates
+
+    // 验证坐标有效性
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      console.error('[SensorLayer] 传感器坐标无效')
+      return
+    }
+
+    const [lng, lat] = coordinates
+
+    // 验证经纬度范围
+    if (typeof lng !== 'number' || typeof lat !== 'number' ||
+        lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+      console.error('[SensorLayer] 传感器坐标超出有效范围')
+      return
+    }
 
     // 从 GeoJSON feature 提取传感器数据
     const sensor: SensorPoint = {
       id: feature.properties?.id || 'unknown',
-      lng: feature.geometry.coordinates[0],
-      lat: feature.geometry.coordinates[1],
+      lng,
+      lat,
       metadata: feature.properties
     }
 
@@ -139,21 +172,24 @@ export default function SensorLayer() {
   }, [])
 
 
+  // 鼠标样式处理器 - 移到外部避免重复创建
+  const handleMouseEnter = useCallback(() => {
+    const canvas = map?.getCanvas()
+    if (canvas) {
+      canvas.style.cursor = 'pointer'
+    }
+  }, [map])
+
+  const handleMouseLeave = useCallback(() => {
+    const canvas = map?.getCanvas()
+    if (canvas) {
+      canvas.style.cursor = ''
+    }
+  }, [map])
+
   // 监听 cluster 和 sensor 层的点击事件
   useEffect(() => {
     if (!map) return
-
-    const handleMouseEnter = () => {
-      if (map.getCanvas()) {
-        map.getCanvas().style.cursor = 'pointer'
-      }
-    }
-
-    const handleMouseLeave = () => {
-      if (map.getCanvas()) {
-        map.getCanvas().style.cursor = ''
-      }
-    }
 
     // Cluster 事件
     map.on('click', CLUSTER_LAYER_ID, handleClusterClick)
@@ -176,7 +212,7 @@ export default function SensorLayer() {
       map.off('mouseenter', SENSOR_LAYER_ID, handleMouseEnter)
       map.off('mouseleave', SENSOR_LAYER_ID, handleMouseLeave)
     }
-  }, [map, handleClusterClick, handleSensorClick])
+  }, [map, handleClusterClick, handleSensorClick, handleMouseEnter, handleMouseLeave])
 
   // 注释：移除了自动关闭逻辑，现在只能通过点击 X 按钮手动关闭 popup
 

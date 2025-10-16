@@ -110,27 +110,32 @@ export default function ClusterPopup({ coordinates, sensors, onClose }: ClusterP
                     </div>
                   </div>
 
-                  {/* 额外的 metadata（如果有） */}
-                  {sensor.metadata && Object.keys(sensor.metadata).length > 0 && (
-                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #e5e7eb' }}>
-                      {Object.entries(sensor.metadata).map(([key, value]) => (
-                        <div key={key} style={{
-                          fontSize: 11,
-                          color: '#6b7280',
-                          marginBottom: 2,
-                          display: 'flex',
-                          gap: 6
-                        }}>
-                          <span style={{ fontWeight: 500 }}>{key}:</span>
-                          <span style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}>{String(value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {/* 额外的 metadata（如果有） - 过滤掉 id 因为已经显示 */}
+                  {sensor.metadata && (() => {
+                    const entries = Object.entries(sensor.metadata).filter(([key]) => key !== 'id')
+                    if (entries.length === 0) return null
+
+                    return (
+                      <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #e5e7eb' }}>
+                        {entries.map(([key, value]) => (
+                          <div key={key} style={{
+                            fontSize: 11,
+                            color: '#6b7280',
+                            marginBottom: 2,
+                            display: 'flex',
+                            gap: 6
+                          }}>
+                            <span style={{ fontWeight: 500 }}>{key}:</span>
+                            <span style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
