@@ -7,6 +7,7 @@ import AOIPreview from '@/components/map/layers/AOIPreview'
 import AOIPanel from '@/components/map/panels/AOIPanel'
 import PstaFireRisk from '@/components/map/layers/PstaFireRisk'
 import CwfisFireRisk from '@/components/map/layers/CwfisFireRisk'
+import SensorLayer from '@/components/map/layers/SensorLayer'
 
 export default function Page() {
   // const DBG = { Map, NavigationControl, Source, Layer, DrawControl, PstaFireRisk, AOIPanel, useControl, CwfisFireRisk}
@@ -15,6 +16,7 @@ export default function Page() {
     <MapRoot>
       <DrawControl position="top-left" />
       <AOIPreview />
+      <SensorLayer />
       <PstaFireRisk visible opacity={0.7} /* beforeId 可选 */ />
       <CwfisFireRisk />
       <AOIPanel />
