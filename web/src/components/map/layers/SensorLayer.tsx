@@ -18,6 +18,7 @@ import { useAOIStore } from '@/store/useAOIStore'
 import { useSensorStore } from '@/store/useSensorStore'
 import { filterValidSensors } from '@/lib/validators'
 import ClusterPopup from '@/components/map/popups/ClusterPopup'
+import SensorPopup from '@/components/map/popups/SensorPopup'
 import type { SensorPoint } from '@/types/sensor'
 import type { FeatureCollection, Point } from 'geojson'
 
@@ -68,6 +69,8 @@ export default function SensorLayer() {
     sensors: SensorPoint[]
   } | null>(null)
 
+  const [selectedSensor, setSelectedSensor] = useState<SensorPoint | null>(null)
+
   // Cluster 点击处理器
   const handleClusterClick = useCallback(async (event: any) => {
     const feature = event.features?.[0]
@@ -115,7 +118,28 @@ export default function SensorLayer() {
     setSelectedCluster(null)
   }, [])
 
-  // 监听 cluster 层的点击事件
+  const handleCloseSensorPopup = useCallback(() => {
+    setSelectedSensor(null)
+  }, [])
+
+  // Sensor 点击处理器
+  const handleSensorClick = useCallback((event: any) => {
+    const feature = event.features?.[0]
+    if (!feature) return
+
+    // 从 GeoJSON feature 提取传感器数据
+    const sensor: SensorPoint = {
+      id: feature.properties?.id || 'unknown',
+      lng: feature.geometry.coordinates[0],
+      lat: feature.geometry.coordinates[1],
+      metadata: feature.properties
+    }
+
+    setSelectedSensor(sensor)
+  }, [])
+
+
+  // 监听 cluster 和 sensor 层的点击事件
   useEffect(() => {
     if (!map) return
 
@@ -131,16 +155,28 @@ export default function SensorLayer() {
       }
     }
 
+    // Cluster 事件
     map.on('click', CLUSTER_LAYER_ID, handleClusterClick)
     map.on('mouseenter', CLUSTER_LAYER_ID, handleMouseEnter)
     map.on('mouseleave', CLUSTER_LAYER_ID, handleMouseLeave)
 
+    // Sensor 事件
+    map.on('click', SENSOR_LAYER_ID, handleSensorClick)
+    map.on('mouseenter', SENSOR_LAYER_ID, handleMouseEnter)
+    map.on('mouseleave', SENSOR_LAYER_ID, handleMouseLeave)
+
     return () => {
+      // Cluster cleanup
       map.off('click', CLUSTER_LAYER_ID, handleClusterClick)
       map.off('mouseenter', CLUSTER_LAYER_ID, handleMouseEnter)
       map.off('mouseleave', CLUSTER_LAYER_ID, handleMouseLeave)
+
+      // Sensor cleanup
+      map.off('click', SENSOR_LAYER_ID, handleSensorClick)
+      map.off('mouseenter', SENSOR_LAYER_ID, handleMouseEnter)
+      map.off('mouseleave', SENSOR_LAYER_ID, handleMouseLeave)
     }
-  }, [map, handleClusterClick])
+  }, [map, handleClusterClick, handleSensorClick])
 
   // 注释：移除了自动关闭逻辑，现在只能通过点击 X 按钮手动关闭 popup
 
@@ -156,6 +192,7 @@ export default function SensorLayer() {
       try {
         setLoading(true)
         setError(null)
+        console.log('[SensorLayer] 开始获取传感器数据...')
 
         // 调用后端 API
         const response = await fetch('/api', {
@@ -288,6 +325,14 @@ export default function SensorLayer() {
           coordinates={selectedCluster.coordinates}
           sensors={selectedCluster.sensors}
           onClose={handleClosePopup}
+        />
+      )}
+
+      {/* Sensor Popup - 显示点击的单个传感器详情 */}
+      {selectedSensor && (
+        <SensorPopup
+          sensor={selectedSensor}
+          onClose={handleCloseSensorPopup}
         />
       )}
     </>
